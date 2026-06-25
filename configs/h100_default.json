@@ -18,5 +18,8 @@
   "beta1": 0.9,
   "beta2": 0.95,
   "grad_clip": 1.0,
+  "schedule": "wsd",
+  "decay_frac": 0.2,
+  "logit_softcap": 30.0,
   "log_every": 50
 }

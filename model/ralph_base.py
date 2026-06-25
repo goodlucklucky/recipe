@@ -36,6 +36,7 @@ class RalphConfig:
     rms_norm_eps: float = 1e-5
     init_std: float = 0.02
     tie_embeddings: bool = True
+    logit_softcap: float = 0.0  # 0 = off; Gemma-2 style tanh soft-cap on output logits
 
 
 def _rms_norm(x: torch.Tensor, weight: torch.Tensor, eps: float) -> torch.Tensor:
@@ -201,6 +202,9 @@ class RalphBase(nn.Module):
             logits = F.linear(x, self.tok_embed.weight)
         else:
             logits = self.lm_head(x)
+        if self.cfg.logit_softcap > 0:
+            sc = self.cfg.logit_softcap
+            logits = sc * torch.tanh(logits / sc)
         loss = None
         if targets is not None:
             loss = F.cross_entropy(

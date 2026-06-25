@@ -64,6 +64,14 @@ class TrainConfig:
     muon_momentum: float = 0.95
     muon_ns_steps: int = 5
 
+    # LR schedule. "cosine" = warmup -> cosine decay to min_lr (pre-v0.3.0).
+    # "wsd" = warmup -> hold max_lr -> linear decay to min_lr over the final
+    # decay_frac of steps (warmup-stable-decay). logit_softcap = Gemma-2 style
+    # tanh soft-cap on output logits (0 = off).
+    schedule: str = "cosine"
+    decay_frac: float = 0.2
+    logit_softcap: float = 0.0
+
     # Data + reproducibility
     manifest_path: str = "data/data_manifest.json"
     data_base_dir: str = "data"
@@ -100,8 +108,17 @@ def set_determinism(seed: int) -> None:
 
 
 def cosine_lr(step: int, cfg: TrainConfig) -> float:
+    # Warmup (shared by both schedules).
     if step < cfg.warmup_steps:
         return cfg.max_lr * (step + 1) / max(1, cfg.warmup_steps)
+    if cfg.schedule == "wsd":
+        # Warmup -> hold max_lr -> linear decay to min_lr over the final decay_frac.
+        decay_start = int(cfg.total_steps * (1.0 - cfg.decay_frac))
+        if step < decay_start:
+            return cfg.max_lr
+        prog = (step - decay_start) / max(1, cfg.total_steps - decay_start)
+        prog = min(1.0, max(0.0, prog))
+        return cfg.max_lr + (cfg.min_lr - cfg.max_lr) * prog
     progress = (step - cfg.warmup_steps) / max(1, cfg.total_steps - cfg.warmup_steps)
     progress = min(1.0, max(0.0, progress))
     return cfg.min_lr + 0.5 * (cfg.max_lr - cfg.min_lr) * (1 + math.cos(math.pi * progress))
@@ -116,6 +133,7 @@ def build_model(cfg: TrainConfig) -> RalphBase:
         head_dim=cfg.head_dim,
         ffn_mult=cfg.ffn_mult,
         max_seq_len=cfg.max_seq_len,
+        logit_softcap=cfg.logit_softcap,
     ))
 
 
