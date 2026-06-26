@@ -76,6 +76,13 @@ class TrainConfig:
     # Logging
     log_every: int = 10
 
+    # LR schedule
+    schedule: str = "wsd"
+    decay_frac: float = 0.3
+
+    # Architecture pass-through
+    logit_softcap: float = 0.0
+
     @property
     def grad_accum_steps(self) -> int:
         assert self.batch_size % self.micro_batch_size == 0
@@ -107,6 +114,21 @@ def cosine_lr(step: int, cfg: TrainConfig) -> float:
     return cfg.min_lr + 0.5 * (cfg.max_lr - cfg.min_lr) * (1 + math.cos(math.pi * progress))
 
 
+def wsd_lr(step: int, cfg: TrainConfig) -> float:
+    """Warmup → stable at max_lr → linear decay to min_lr over last decay_frac of steps."""
+    if step < cfg.warmup_steps:
+        return cfg.max_lr * (step + 1) / max(1, cfg.warmup_steps)
+    stable_end = cfg.total_steps - int(cfg.total_steps * cfg.decay_frac)
+    if step < stable_end:
+        return cfg.max_lr
+    t = (step - stable_end) / max(1, cfg.total_steps - stable_end)
+    return cfg.min_lr + (cfg.max_lr - cfg.min_lr) * (1.0 - t)
+
+
+def get_lr(step: int, cfg: TrainConfig) -> float:
+    return wsd_lr(step, cfg) if cfg.schedule == "wsd" else cosine_lr(step, cfg)
+
+
 def build_model(cfg: TrainConfig) -> RalphBase:
     return RalphBase(RalphConfig(
         vocab_size=cfg.vocab_size,
@@ -116,6 +138,7 @@ def build_model(cfg: TrainConfig) -> RalphBase:
         head_dim=cfg.head_dim,
         ffn_mult=cfg.ffn_mult,
         max_seq_len=cfg.max_seq_len,
+        logit_softcap=cfg.logit_softcap,
     ))
 
 
@@ -271,7 +294,7 @@ def train(cfg: TrainConfig, out_dir: Path, use_wandb: bool = False) -> dict:
     tokens_seen = 0
     last_loss = float("nan")
     for step in range(cfg.total_steps):
-        lr = cosine_lr(step, cfg)
+        lr = get_lr(step, cfg)
         # Scale each optimizer's per-group base_lr by the schedule fraction so
         # the Muon and AdamW groups keep distinct learning rates.
         lr_frac = lr / cfg.max_lr
