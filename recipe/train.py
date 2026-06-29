@@ -29,7 +29,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data import TokenShardDataset
-from model import RalphBase, RalphConfig
+from model.ralph325 import RalphBase, RalphConfig
 
 
 @dataclass
@@ -55,6 +55,7 @@ class TrainConfig:
     beta1: float = 0.9
     beta2: float = 0.95
     grad_clip: float = 1.0
+    qk_norm: bool = True
 
     # Optimizer. "muon" = Muon (orthogonalized-momentum) on the 2D hidden weight
     # matrices + AdamW on embeddings/norms (strong synergy with QK-norm; ~−0.13
@@ -116,6 +117,7 @@ def build_model(cfg: TrainConfig) -> RalphBase:
         head_dim=cfg.head_dim,
         ffn_mult=cfg.ffn_mult,
         max_seq_len=cfg.max_seq_len,
+        qk_norm=cfg.qk_norm,
     ))
 
 
