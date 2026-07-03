@@ -1,5 +1,5 @@
 {
-  "_comment": "b300_16k_lr6: 254M H100 proxy model, 16k steps, seq_len 512.",
+  "_comment": "ETHIN v1.3: readout-cal arch, WSD 1-sqrt cooldown (max_lr=1.5e-3 min=1.5e-5=max/100 decay_frac=0.2), muon 0.03/0.85 beta1=0.8 clip=0.5, batch=512 micro=128 ffn=2.6875, 7100 steps.",
   "vocab_size": 50257,
   "dim": 1024,
   "n_layers": 16,
@@ -10,13 +10,18 @@
   "seq_len": 512,
   "batch_size": 512,
   "micro_batch_size": 128,
-  "total_steps": 2400,
-  "warmup_steps": 240,
-  "max_lr": 0.0008,
-  "min_lr": 3e-05,
+  "total_steps": 7100,
+  "warmup_steps": 710,
+  "max_lr": 0.0015,
+  "min_lr": 1.5e-05,
   "weight_decay": 0.1,
-  "beta1": 0.9,
+  "beta1": 0.8,
   "beta2": 0.98,
-  "grad_clip": 1.0,
-  "log_every": 50
+  "grad_clip": 0.5,
+  "log_every": 50,
+  "muon_lr": 0.03,
+  "muon_momentum": 0.85,
+  "schedule": "wsd",
+  "decay_frac": 0.2,
+  "decay_shape": "sqrt"
 }

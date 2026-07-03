@@ -64,6 +64,10 @@ class TrainConfig:
     muon_momentum: float = 0.95
     muon_ns_steps: int = 5
 
+    schedule: str = "wsd"
+    decay_frac: float = 0.3
+    decay_shape: str = "linear"  # "sqrt" (1-sqrt cooldown) | "cosine" | "linear"
+
     # Data + reproducibility
     manifest_path: str = "data/data_manifest.json"
     data_base_dir: str = "data"
@@ -105,6 +109,27 @@ def cosine_lr(step: int, cfg: TrainConfig) -> float:
     progress = (step - cfg.warmup_steps) / max(1, cfg.total_steps - cfg.warmup_steps)
     progress = min(1.0, max(0.0, progress))
     return cfg.min_lr + 0.5 * (cfg.max_lr - cfg.min_lr) * (1 + math.cos(math.pi * progress))
+
+
+def wsd_lr(step: int, cfg: TrainConfig) -> float:
+    if step < cfg.warmup_steps:
+        return cfg.max_lr * (step + 1) / max(1, cfg.warmup_steps)
+    stable_end = cfg.total_steps - int(cfg.total_steps * cfg.decay_frac)
+    if step < stable_end:
+        return cfg.max_lr
+    t = (step - stable_end) / max(1, cfg.total_steps - stable_end)
+    shape = getattr(cfg, "decay_shape", "linear")
+    if shape == "sqrt":
+        frac = 1.0 - math.sqrt(t)            # 1-sqrt cooldown: fast drop, long low-LR tail
+    elif shape == "cosine":
+        frac = 0.5 * (1.0 + math.cos(math.pi * t))
+    else:
+        frac = 1.0 - t                        # linear
+    return cfg.min_lr + (cfg.max_lr - cfg.min_lr) * frac
+
+
+def get_lr(step: int, cfg: TrainConfig) -> float:
+    return wsd_lr(step, cfg) if cfg.schedule == "wsd" else cosine_lr(step, cfg)
 
 
 def build_model(cfg: TrainConfig) -> RalphBase:
@@ -271,7 +296,7 @@ def train(cfg: TrainConfig, out_dir: Path, use_wandb: bool = False) -> dict:
     tokens_seen = 0
     last_loss = float("nan")
     for step in range(cfg.total_steps):
-        lr = cosine_lr(step, cfg)
+        lr = get_lr(step, cfg)
         # Scale each optimizer's per-group base_lr by the schedule fraction so
         # the Muon and AdamW groups keep distinct learning rates.
         lr_frac = lr / cfg.max_lr
