@@ -1,5 +1,5 @@
 {
-  "_comment": "b300_16k_lr6: 254M H100 proxy model, 16k steps, seq_len 512.",
+  "_comment": "v1.0 ETHIN: enhanced optimizer (WSD max_lr=4.5e-3 muon=0.03/0.85 b1=0.8 clip=0.5) on canonical arch (readout-cal in model/ralph_base.py), batch=512 micro=64 ffn=2.6875, 3000 steps (budget-max ~4.55/5.0 H100h).",
   "vocab_size": 50257,
   "dim": 1024,
   "n_layers": 16,
@@ -9,14 +9,18 @@
   "max_seq_len": 1024,
   "seq_len": 512,
   "batch_size": 512,
-  "micro_batch_size": 128,
-  "total_steps": 2400,
-  "warmup_steps": 240,
-  "max_lr": 0.0008,
-  "min_lr": 3e-05,
+  "micro_batch_size": 64,
+  "total_steps": 3000,
+  "warmup_steps": 300,
+  "max_lr": 0.0045,
+  "min_lr": 0.00045,
   "weight_decay": 0.1,
-  "beta1": 0.9,
+  "beta1": 0.8,
   "beta2": 0.98,
-  "grad_clip": 1.0,
-  "log_every": 50
+  "grad_clip": 0.5,
+  "log_every": 50,
+  "muon_lr": 0.03,
+  "muon_momentum": 0.85,
+  "schedule": "wsd",
+  "decay_frac": 0.3
 }
